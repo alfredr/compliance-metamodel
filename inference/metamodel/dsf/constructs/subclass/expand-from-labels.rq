@@ -1,0 +1,23 @@
+PREFIX dsf: <https://openprovenance.org/ns/facet/dsf#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+# Expand dsf:fromAnyLabel in subclass declarations into fromLabel properties
+# This pre-computes the list traversal once to avoid expensive repeated traversals
+# For example: fromAnyLabel (A B C) creates:
+# - fromLabel A
+# - fromLabel B
+# - fromLabel C
+
+CONSTRUCT {
+    # Add fromLabel for each label in the list
+    ?subclassDecl dsf:fromLabel ?singleLabel .
+}
+WHERE {
+    # Find subclass declarations with fromAnyLabel lists
+    ?framework dsf:declaresSubclassOf ?subclassDecl .
+    ?subclassDecl dsf:fromAnyLabel ?labelList .
+
+    # Extract individual labels from the list
+    ?labelList rdf:rest*/rdf:first ?singleLabel .
+}

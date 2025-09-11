@@ -1,0 +1,766 @@
+\documentclass{IOS-Book-Article}
+
+\usepackage{mathptmx}
+
+% Additional packages needed for the paper
+\usepackage{tikz}
+\usetikzlibrary{positioning,calc,arrows.meta,decorations.markings}
+\usepackage{graphicx}
+\usepackage[inline]{enumitem}
+\usepackage{listings}
+\usepackage{booktabs}  % For \toprule, \midrule, \bottomrule
+\usepackage{amssymb}   % For \checkmark
+\usepackage{amsmath}   % For align* and other math environments
+\usepackage{url}       % For URLs in bibliography
+
+% IOS Press template handles spacing
+\sloppy  % More aggressive than \tolerance alone 
+
+% Theorem environments
+\newtheorem{theorem}{Theorem}[section]
+
+% Proof environment (if not provided by IOS template)
+\newenvironment{proof}[1][Proof]{\textbf{#1.} }{\hfill$\square$\par}
+
+\newcommand{\ttl}[1]{\texttt{:{#1}}}
+\newcommand{\model}[1]{\texttt{#1}}
+\newcommand{\contains}{\mathit{contains}}
+\newcommand{\belongsToFacet}{\mathit{belongsToFacet}}
+\newcommand{\joinableWith}{\mathit{JoinableWith}}
+
+% Semantic markup commands using sym
+\newcommand{\sym}[1]{\text{\small\texttt{:{#1}}}}
+\newcommand{\fnsym}[1]{\text{\footnotesize\texttt{:{#1}}}}
+\newcommand{\facet}[1]{\sym{#1}}
+\newcommand{\clabel}[1]{\sym{#1}}  % Using clabel to avoid conflict with existing \label
+\newcommand{\framework}[1]{\text{\small{#1}}}
+
+% Setup for listings package
+\lstset{
+  basicstyle=\ttfamily\footnotesize,   % Use typewriter font, footnote size
+  columns=flexible,          % Flexible column width
+  keepspaces=true,             % Preserve spaces
+  breaklines=true,             % Allow line breaks
+  breakatwhitespace=true,      % Prefer breaking at whitespace
+  aboveskip=\smallskipamount,  % Space above listing
+  belowskip=\smallskipamount,   % Space below listing
+  xleftmargin=2em              % Indent listings from the left
+}
+
+% URL package loaded for bibliography
+
+\begin{document}
+
+\pagestyle{headings}
+\begin{frontmatter}
+
+\title{A Metamodel for Multi-Framework Context-Dependent Data Compliance Assessments}
+\runningtitle{A Metamodel for Data Compliance Assessments}
+
+\author[A]{\fnms{Luc} \snm{Moreau}},
+\author[B]{\fnms{Alfred} \snm{Rossi}}
+and
+\author[C]{\fnms{Sophie} \snm{Stalla-Bourdillon}}
+
+\runningauthor{L. Moreau, A. Rossi, S. Stalla-Bourdillon}
+\address[A]{University of Sussex, Brighton, United Kingdom}
+\address[B]{Immuta Research, Boston, Massachusetts, USA}
+\address[C]{Brussels Privacy Hub, Vrije Universiteit Brussel, Brussels, Belgium}
+
+\begin{abstract}
+Motivated by the challenges of implementing policy-based data access control (PBAC) under multiple simultaneously applicable compliance frameworks, we present an open, modular, and extensible rule system for evaluating context-dependent data compliance status. We demonstrate the utility of this system through application to existing legal frameworks and industry standards, offering insights for comparative framework analysis. Applications of this system include compliance policy enforcement, compliance monitoring, data discovery, and risk assessment.
+\end{abstract}
+
+\begin{keyword}
+data governance\sep compliance management\sep privacy frameworks\sep semantic web\sep first-order logic
+\end{keyword}
+
+\end{frontmatter}
+
+\section{Introduction}\label{sec:introduction}
+
+% 1. Initially motivate on the legal side of things
+
+Determining the permissibility of a data processing activity is an inherently complex task that often requires reasoning across multiple, overlapping policies and regulations. Such determinations are rarely dictated by the data alone; rather, they depend on contextual factors such as the roles of individuals involved, the purposes and methods of collection, jurisdictional constraints, the simultaneous availability of related data, the strength of organizational controls, assumptions about adversarial capabilities, and temporal considerations.
+
+Determining the compliance status of the data itself is often an important first step, as access policies typically depend on these classifications~\cite{xacml,nist-sp-800-95,nist-ir-7657}. However, complicating matters, the exact same dataset containing patient information may be classified as Protected Health Information (PHI) under the U.S. Health Insurance Portability and Accountability Act (HIPAA)~\cite{hipaa-privacy} when processed by a covered entity, but as special category personal data under the General Protection Data Regulation (GDPR)~\cite{gdpr}. While data considered de-identified under either of HIPAA's regulatory standards for de-identification (safe harbor or expert determination) statutorily falls outside of HIPAA's scope, it may remain controlled as anything from anonymized data to special category personal data under the GDPR depending upon the exact details. In short, compliance status is context-dependent.
+
+Structured data further complicates this task. A dataset containing only diagnosis, gender, and age information with a randomly assigned record identifier might be considered suitable for public release; yet if other datasets reuse the same identifier while adding additional demographic details, the released information may not be considered de-identified. The availability of identifiers, therefore, must be considered, as their presence or availability may drastically change the data compliance status.
+
+% Organizations have their own interpretation
+Further complicating matters, an organization's internal compliance rules often depend on classifications made under others. For example, a policy might state that data classified as PHI under HIPAA requires encryption and audit logging, or personal data under GDPR is prohibited from cross-border transfer. Or that certain combinations of domain-specific fields may be identifiable in other contexts. Such rules create interdependencies among frameworks, whereby the resulting compliance status goes beyond the disjoint union of framework determinations.
+
+\paragraph{Terminology.}
+Before presenting our approach, we define three central terms used throughout this paper. We use \emph{compliance framework} to mean organizational rules for interpreting regulatory standards (e.g., GDPR, HIPAA) and classifying data. A \emph{governance scope} represents organizational boundaries within which compliance is evaluated. The term \emph{metamodel} reflects that our approach provides structures and semantics from which specific compliance scenarios are instantiated.
+
+\paragraph{Approach.}
+To address these challenges, we formulate compliance assessment of structured data as a computational problem: propagating semantic annotations through data structures and across relationships. Data containers (databases, tables, columns) are organized hierarchically, and compliance labels propagate according to framework-specific rules: inward to contained elements, outward to containers, among peers, or across joinable relationships. We implement this in RDF, leveraging its established use in privacy vocabularies (DPV~\cite{pandit2019dpv}), policy languages (ODRL~\cite{odrl-model-2018,odrl-vocab-2018}), and data governance initiatives~\cite{bader2020}.
+
+
+\paragraph{Contributions.}
+This paper makes three contributions. First, we introduce a metamodel for context-dependent compliance assessment of structured data that captures how the same data receives different classifications based on governance scope, available relationships, and applicable frameworks. Second, we demonstrate how to encode real-world frameworks (HIPAA with Safe Harbor and Expert Determination, and interpretations of the GDPR by the European Medicines Agency (EMA) and Italian Data Protection Authority) as computational rules that derive compliance classifications through propagation. Third, we provide mathematical foundations proving polynomial-time convergence despite complex cross-framework dependencies.
+
+\paragraph{Organization.}
+The remainder of this paper is structured as follows. Section~\ref{sec:legal} identifies five compliance challenges through real-world scenarios. Section~\ref{sec:concepts} introduces our metamodel's concepts for representing data containers, compliance frameworks, and their relationships. Section~\ref{sec:modeling} demonstrates how to model specific frameworks (Base, HIPAA, GDPR, the Italian DPA's approach to anonymization under GDPR) using these concepts. Section~\ref{sec:validation} validates that our approach addresses all five challenges through a healthcare scenario. Section~\ref{sec:formalization} provides the mathematical foundations and proves convergence properties. Section~\ref{sec:implementation} describes the RDF-based implementation. Section~\ref{sec:related-conclusion} positions our work relative to existing semantic technologies and concludes with future directions.
+
+\section{Compliance Challenges}\label{sec:legal}
+
+This context-dependent nature of compliance assessment defeats static annotation approaches, which cannot capture the situational nuances of the broader compliance environment. To illustrate these challenges, we turn to healthcare, where organizations must reconcile multiple frameworks with conflicting requirements.
+
+\paragraph{HIPAA.}
+The Health Insurance Portability and Accountability Act (HIPAA)~\cite{hipaa-privacy} operates as a binary switch: data is either Protected Health Information (PHI), subject to all regulatory requirements, or entirely outside its scope, as in the case of de-identified data. A common interpretation extends PHI status transitively, such that any data joined to the patient record becomes part of the patient’s \emph{designated record set}~\cite{hipaa-privacy}. Yet HIPAA’s scope is context-dependent, and identical data may be regulated or not depending on its system of record and purpose. For example, employee vaccination records are excluded when maintained for workplace safety\footnote{Employee records are excluded from the definition of PHI as per 45 C.F.R. § 160.103.}, but become PHI when entered into clinical systems. Similarly, Social Security numbers must be removed from patient record extracts before they can be considered de-identified, yet their presence in employee records does not trigger HIPAA protections, even when the employer is a clinic and the employee is also a patient.
+
+
+\paragraph{GDPR.}
+The General Data Protection Regulation (GDPR)~\cite{gdpr} takes a different stance. Rather than closure through joins, GDPR distinguishes data \emph{identifying} individuals from data merely \emph{about} them. Removing identifiers may render data anonymous, though regulators disagree on whether anonymization is achievable~\cite{stalla_rossi_2021,stalla_2025} and it takes time for the Court of Justice of the European Union case law to mature~\cite{srb}. The European Medicines Agency (EMA), in the context of the publication of clinical trial publication, recommends risk-based thresholds, (e.g. permitting disclosure when the re-identification probability falls below 0.09)~\cite{ema_external_guidance_2016,ema_external_guidance_2025}. By contrast, the Italian Data Protection Authority (DPA), drawing on Article 29 Working Party guidance~\cite{wp29-anonymization}, rejects singling out: datasets remain personal data whenever unique identifiers enable individual distinction, regardless of actual re-identification risk~\cite{italian-thin-2023}.
+
+Consider a clinic joining employee vaccination records with patient treatment records. Under HIPAA’s transitive approach, the entire dataset becomes PHI, since employee identifiers inherit PHI status through association. Under GDPR, only vaccination information qualifies as special category health data, while employee identifiers may retain their original classification as ordinary personal data, depending on context~\cite{lindenapotheke}. This divergence underscores the need for framework-specific propagation rules. A similar pattern appears with de-identification: a dataset may be released only if the risk of re-identification is acceptably low. 
+
+One common method is \emph{k-anonymization}, which ensures that each individual record is indistinguishable from at least $k-1$ others with respect to quasi-identifier attributes. A $k$-anonymized dataset tagged only with a random identifier may be considered suitable for release under HIPAA Expert Determination (45 C.F.R. § 164.514(b)(1)), conditionally acceptable under EMA Policy 0070~\cite{ema-policy0070,ema_external_guidance_2025} with $k \geq 12$, yet always prohibited under the Italian DPA’s interpretation~\cite{italian-thin-2023}. HIPAA balances data and context risk\footnote{HIPAA thresholds reflect common practice. OCR guidance~\cite{ocr-deid-guidance} does not specify numerical standards for ``very small'' risk, but $k=5$ is a common recommendation in practice~\cite{el-emam-2009}.}, EMA imposes explicit thresholds, and the Italian DPA rejects risk-based reasoning entirely. These differences highlight the incompatibility of static compliance definitions across jurisdictions.
+\begin{table}[ht]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{0.9}
+\begin{tabular}{lccc}
+\toprule
+\textbf{$k$ Value} & \textbf{HIPAA}\footnote{HIPAA thresholds reflect common practice. OCR guidance~\cite{ocr-deid-guidance} does not specify numerical standards for ``very small'' risk, but k=5 is a common recommendation in practice~\cite{el-emam-2009}.} & \textbf{GDPR (EMA)} & \textbf{GDPR (Italian)} \\
+\midrule
+$k \geq 12$ & \checkmark & \checkmark & $\times$ \\
+$k = 5$ & \checkmark & $\times$ & $\times$ \\
+$k < 3$ & $\times$ & $\times$ & $\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Regulatory suitability of public release of $k$-anonymized datasets (with random record identifiers) under HIPAA Expert Determination, EMA Policy 0070 guidance, and Italian DPA interpretation of GDPR.}
+\label{tab:regulatory-divergence}
+\end{table}
+\vspace{-\baselineskip}
+
+\paragraph{Compliance Challenges.}
+From the preceding discussion we distill five challenges to compliance assessment:
+\begin{enumerate*}[label=(\arabic*)]
+  \item \emph{context-dependent classification}, where identical data may receive different statuses across environments (e.g., vaccination records treated as HR data in one setting but PHI in clinical systems);
+  \item \emph{diverging interpretations}, where the same dataset produces contradictory outcomes within one environment (e.g., joined employee–patient records treated as PHI in one framework but split into identifiers and medical data in another, with differing risk thresholds);
+  \item \emph{proximity semantics}, where the availability of nearby data within a scope or operation alters compliance status (e.g., employee identifiers acquiring PHI status when linked to patient treatments);
+  \item \emph{de\-identification scenarios}, which should be modeled in a way that allows reasoning from both structural assertions (e.g., removal of enumerated identifiers) and statistical assertions (e.g., $k \geq 3$, $k \geq 12$), while also accommodating frameworks that reject risk-based methods altogether;
+  \item \emph{comparative evaluation}, where side-by-side analysis makes divergences explicit (e.g., Table~\ref{tab:regulatory-divergence} shows a $k=5$ dataset acceptable under one framework but prohibited under others)
+\end{enumerate*}.
+
+\section{Metamodel Description}\label{sec:concepts}
+
+Our metamodel provides a formal foundation for reasoning about multi-framework compliance through five concepts:
+\begin{enumerate*}[label=(\roman*)]
+\item \emph{containers} representing data storage hierarchically,
+\item \emph{frameworks} encoding regulatory regimes like GDPR or HIPAA,
+\item \emph{labels} classifying data properties,
+\item \emph{assertions} tracking which containers have which labels, and
+\item \emph{scopes} defining compliance environment boundaries.
+\end{enumerate*}
+
+\paragraph{Data Containers and Relations.}
+Containers represent data storage locations (databases, tables, columns, fields) organized through an acyclic containment hierarchy. The containment relation is irreflexive and acyclic, forming a forest structure where each container has at most one parent. Containers sharing a parent are siblings. Orthogonal to this hierarchy, explicit joinability declarations mark which containers can exchange data during operations, enabling proper tracking of compliance properties across transformations.
+
+\paragraph{Compliance Labels, Facets, and Frameworks.}
+Frameworks represent specific compliance interpretations such as GDPR, HIPAA, or internal policies. Each framework introduces a vocabulary of labels and rules that govern their behavior through subclass hierarchies, conditional equivalences, and propagation patterns across container hierarchies and joinable relations. Labels are atomic classification units that belong to facets, which organize cross-cutting concerns such as identifiability, controlled categories, or risk levels. Labels may also be parameterized to capture quantitative requirements, for example $k$-anonymity values or retention periods. Together, these elements encode regulatory logic in computational form.
+
+\paragraph{Framework Inheritance.}
+Frameworks extend others, inheriting rules and label hierarchies. When EMA extends GDPR, it inherits GDPR's label taxonomy (e.g., SpecialCategoryData $\subseteq$ PersonalData) and propagation rules, while adding stricter $k$-anonymity thresholds. This enables jurisdictional variations without duplicating base logic. Child frameworks may override inherited rules.
+
+\paragraph{Assertions and Scopes.}
+Governance scopes represent compliance environments providing context for assertions. Containers exist independently of scopes and may appear in multiple environments simultaneously with different compliance labels in each. Initially, containers enter scopes with ground assertions (fundamental properties like containing names or medical codes); framework rules derive additional labels during inference. Compliance assertions track framework-assigned labels to containers within scopes. Containment assertions declare labels within containers, with parent containers transitively containing descendant labels.
+
+\paragraph{Rule Types.}
+All rules reduce to implications: if a container meets certain conditions, it must also receive a new label. The simplest case is label-to-label: if $A$ then $B$. More generally, conditions alone may yield a label without prerequisites. Propagation rules replicate labels across structure (parent–child, child–parent, siblings, or joinable containers). Equivalence rules bind labels to apply together, often bridging frameworks. Though semantically equivalent to implications, we distinguish subclass rules for clarity of intent; it follows that labels may belong to multiple distinct subclasses. Collectively, rules match assertions, check conditions, and derive or propagate new labels, ensuring compliance properties extend consistently through hierarchies and contexts.
+
+\paragraph{Release Operations.}
+Releases enable data movement across scope boundaries, transferring only ground assertions while leaving context-dependent determinations within their original environments, preserving scope-specific compliance evaluations while allowing controlled data sharing.
+
+\section{Modeling}\label{sec:modeling}
+We instantiate our metamodel with concrete compliance frameworks to demonstrate both expressiveness and practical utility. The \framework{Base} framework provides foundational taxonomies and classification logic, which subsequent frameworks extend and specialize, while \framework{HIPAA} and \framework{GDPR} frameworks illustrate distinct regulatory approaches outlined in Section~\ref{sec:legal}, while the \framework{Italian DPA}'s interpretation shows how jurisdictional rules layer atop base regulations.
+
+
+\paragraph{Base.}
+The \framework{Base} framework establishes a six-facet taxonomy: \facet{Subject} categorizes entities (\clabel{Individual}, \clabel{Organization}); \facet{Identifier} derives classifications from orthogonal properties; \facet{Kind} organizes semantic types with multi-inheritance; \facet{Domain} specifies operational context (\clabel{Healthcare}, \clabel{Financial}); \facet{Statistical} enables quantitative analysis, including SPARQL queries that compute \clabel{KAnonymityAnalysis} assertions; and \facet{Control} provides namespace for regulatory frameworks. \facet{Type}, \facet{Kind}, and \facet{Domain} propagate inward to child containers.
+
+\makeatletter
+\newcount\dirtree@lvl
+\newcount\dirtree@plvl
+\newcount\dirtree@clvl
+\def\dirtree@growth{%
+  \ifnum\tikznumberofcurrentchild=1\relax
+    \global\advance\dirtree@plvl by 1
+    \expandafter\xdef\csname dirtree@p@\the\dirtree@plvl\endcsname{\the\dirtree@lvl}
+  \fi
+  \global\advance\dirtree@lvl by 1\relax
+  \dirtree@clvl=\dirtree@lvl
+  \advance\dirtree@clvl by -\csname dirtree@p@\the\dirtree@plvl\endcsname
+  \pgf@xa=0pt\relax % Start from parent's position
+  \pgf@ya=-0.35cm\relax
+  \pgf@ya=\dirtree@clvl\pgf@ya
+  \pgftransformshift{\pgfqpoint{\the\pgf@xa}{\the\pgf@ya}}%
+  \ifnum\tikznumberofcurrentchild=\tikznumberofchildren
+    \global\advance\dirtree@plvl by -1
+  \fi
+}
+\tikzset{
+  dirtree/.style={
+    growth function=\dirtree@growth,
+    every node/.style={anchor=north,font=\footnotesize\ttfamily},
+    every child node/.style={anchor=west,font=\footnotesize\ttfamily},
+    edge from parent path={([xshift=10pt]\tikzparentnode.south west) |- (\tikzchildnode\tikzchildanchor)}
+  }
+}
+\makeatother
+
+\begin{figure}[ht]
+\centering
+\begin{minipage}[b]{0.45\textwidth}
+\raggedright
+\begin{tikzpicture}[dirtree]
+\node {:BaseFramework} 
+  child { node {:Subject}
+    child { node {:Type} }
+  }
+  child { node {:Identifier}
+    child { node {:Cardinality} }
+    child { node {:Knowability} }
+  }
+  child { node {:Kind} }
+  child { node {:Domain} }
+  child { node {:Control} }
+  child { node {:Statistical} };
+\end{tikzpicture}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.45\textwidth}
+\begin{lstlisting}
+# Identifier derivation rule
+:BaseFramework :declaresEquivalent [
+  :fromAllLabels (
+    :UniqueCardinality 
+    :OpenKnowability) ;
+  :toLabel :DirectIdentifier
+] .
+\end{lstlisting}
+\end{minipage}
+\caption{Base framework facet taxonomy (left) and one case of the identifier derivation rule example (right).}
+\label{fig:base-framework-structure}
+\end{figure}
+
+\paragraph{Identifier Derivation.}
+The \facet{Identifier} facet derives types by combining \clabel{Cardinality} (\clabel{Unique}, \clabel{ClosedGroup}, \clabel{OpenGroup}) with \clabel{Knowability} (\clabel{Open}, \clabel{Closed}), as shown in Table~\ref{tab:identifier-derivation}. This yields nuanced classifications: SSNs, with \clabel{UniqueCardinality} and \clabel{OpenKnowability}, become \clabel{DirectIdentifier}, while internal UUIDs with \clabel{ClosedKnowability} are classified as \clabel{InternalIdentifier}.
+
+
+\begin{table}[ht]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{0.75}
+\begin{tabular}{lclcl}
+\toprule
+\textbf{Derived Label} & & \textbf{Cardinality} & & \textbf{Knowability} \\
+\midrule
+\clabel{DirectIdentifier} & $\equiv$ & \clabel{Unique} & $\land$ & \clabel{Open} \\
+\clabel{InternalIdentifier} & $\equiv$ & \clabel{Unique} & $\land$ & \clabel{Closed} \\
+\clabel{IndirectIdentifier} & $\equiv$ & \clabel{OpenGroup} & $\land$ & \clabel{Open} \\
+\bottomrule
+\end{tabular}
+\caption{Identifier classifications derived from orthogonal properties.}
+\label{tab:identifier-derivation}
+\end{table}
+\vspace{-\baselineskip}
+
+\paragraph{HIPAA.}
+This framework extends the Base \facet{Control} facet to implement the Privacy Rule, introducing concepts centered on Protected Health Information (PHI). It applies expansive propagation: \emph{inward} (to contained fields), \emph{outward} (containers containing PHI become PHI), \emph{peer} (to sibling containers), and \emph{joinable} (to related data). Healthcare data becomes PHI through conditional implication: any container labeled \clabel{Healthcare} that contains either \clabel{HIPAAIdentifier} or \clabel{ProtectedHealthInformation} receives PHI status.
+
+\paragraph{De-identification.}
+Two sub-frameworks define de-identification pathways. \emph{Safe Harbor} removes $18$ enumerated identifiers mapped to \clabel{SafeHarborIdentifier} in healthcare domains. \emph{Expert Determination} requires statistical evidence of ``very small'' re-identification risk, leveraging Base's \clabel{KAnonymityAnalysis} assertions with \texttt{minimumCohortSize} parameters. When $k < 3$ (configurable), \clabel{HighReidentificationRisk} triggers PHI classification, enabling tunable risk thresholds.
+
+\begin{figure}[ht]
+\centering
+\begin{tabular}{@{}c@{\hspace{0.5cm}}c@{}}
+\begin{minipage}[t]{0.47\textwidth}
+\vspace{0pt}
+\begin{lstlisting}
+:SafeHarborFramework 
+  :declaresSubclassOf [
+    :fromAnyLabel (
+      :Name :SSN ... ) ;
+    :isSubclassOf 
+      :SafeHarborIdentifier ;
+    :hasCondition [
+      a :RelationLabelCondition ;
+      :requiresLabel :Healthcare ] ] .
+\end{lstlisting}
+\end{minipage}
+&
+\begin{minipage}[t]{0.47\textwidth}
+\vspace{0pt}
+\begin{lstlisting}
+:ExpertDetermination 
+  :declaresImplication [
+    :fromLabel 
+      :KAnonymityAnalysis ;
+    :toLabel 
+      :HighReidentificationRisk ;
+    :hasCondition [
+      a :ComparisonCondition ;
+      :comparisonOperator 
+        :lessThan ; ... ] ] .
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
+\caption{Safe Harbor (left) maps 18 identifiers to trigger PHI. Expert Determination (right) evaluates $k$-anonymity thresholds. Full source code in Appendix Figures~\ref{fig:appendix-safe-harbor} and \ref{fig:appendix-expert-determination}.}
+\label{fig:hipaa-deid}
+\end{figure}
+
+\paragraph{GDPR.}
+This framework distinguishes data \emph{about} individuals from data that \emph{identifies} them~\cite{wp29-personaldata}. The \clabel{Individual} label marks persistent characteristics, while \clabel{PersonalData} requires linkage with identifiers. Removing identifiers preserves \clabel{Individual} but eliminates \clabel{PersonalData}. GDPR's hierarchy places health data within special category data within personal data. Medical codes become health data only with identifiers in healthcare contexts, keeping anonymous research data unclassified. Propagation is strictly \emph{inward}, maintaining field-level precision versus HIPAA's eager propagation.
+
+
+\paragraph{Italian DPA.}
+The Italian DPA applies a stricter GDPR interpretation, treating \emph{any} unique information about individuals as personal data. While GDPR requires both cardinality and knowability for identifiability, Italy considers uniqueness alone sufficient (see Appendix Figure~\ref{fig:appendix-italian-dpa}). Thus internal UUIDs with \clabel{ClosedKnowability} become \clabel{PersonalData} under Italian rules.
+
+
+\section{Validation}\label{sec:validation}
+
+We validate our metamodel against the five compliance challenges from Section~\ref{sec:legal} through a healthcare scenario where a clinic maintains employee vaccination records separately from patient treatment data, then joins them for research purposes.
+
+\paragraph{Scenario Setup.}
+A clinic's employee vaccination records (\clabel{ProvidersInfo}) exist in \sym{HRScope} containing names, SSNs, and vaccination dates. Patient treatment data (\clabel{PatientTreatments}) resides in \sym{MedicalScope} with diagnoses and procedures. For research analysis, both datasets become available in \sym{ResearchScope} where they can be joined. The same \clabel{ProvidersInfo} data thus appears in multiple scopes with different available relationships.
+
+\paragraph{Challenge 1: Context-dependent classification.}
+Employee vaccination records demonstrate how identical data receives different statuses across environments. In \sym{HRScope}, \clabel{ProvidersInfo} lacks healthcare context despite containing names and SSNs: HIPAA's conditional rule requires both identifiers and healthcare context for PHI classification. In \sym{ResearchScope}, the same records acquire PHI status through joinable propagation from \clabel{PatientTreatments}, mirroring how vaccination records are treated as HR data in one setting but PHI in clinical systems.
+
+\paragraph{Challenge 2: Diverging interpretations.}
+When joined, employee-patient records produce contradictory outcomes across frameworks. HIPAA treats the entire joined dataset as PHI through expansive propagation: employee names and SSNs acquire PHI status via join, vaccination dates become PHI due to healthcare context, resulting in the entire join product being classified as PHI. In contrast, GDPR maintains field-level distinctions: employee names and SSNs remain PersonalData, vaccination dates are classified as HealthData, and the join product preserves these mixed types rather than collapsing to a single classification. This demonstrates how frameworks split the same data differently.
+
+\paragraph{Challenge 3: Proximity semantics.}
+The availability of nearby data within a scope alters compliance status. In \sym{ResearchScope}, employee identifiers acquire PHI status when linked to patient treatments through joinable relationships. HIPAA's four propagation patterns (\emph{inward}, \emph{outward}, \emph{peer}, \emph{joinable}) ensure comprehensive PHI spread, while GDPR's \emph{inward}-only propagation preserves field-level precision: \clabel{PatientTreatments} carries \clabel{HealthData} while sibling \clabel{ProvidersInfo} remains \clabel{PersonalData}.
+
+\paragraph{Challenge 4: De-identification scenarios.}
+The metamodel accommodates both structural and statistical de-identification approaches. HIPAA Safe Harbor requires removing enumerated identifiers (the 18 specific types). Expert Determination uses statistical assertions: when $k < 3$, \clabel{HighReidentificationRisk} triggers PHI classification. EMA requires $k \geq 12$ for public release. The Italian DPA rejects risk-based methods altogether, treating even internal UUIDs with \clabel{ClosedKnowability} as \clabel{PersonalData} based solely on uniqueness.
+
+\paragraph{Challenge 5: Comparative evaluation.}
+Side-by-side analysis makes divergences explicit through framework attribution via \sym{assertedByFramework}. \clabel{ProvidersInfo} simultaneously carries PHI status (HIPAA in \sym{ResearchScope}) and PersonalData (GDPR in both scopes). Like Table~\ref{tab:regulatory-divergence} showing a $k=5$ dataset acceptable under one framework but prohibited under others, our validation demonstrates how the metamodel enables systematic comparison of framework determinations.
+
+\section{Formalization}\label{sec:formalization}
+
+We formalize our metamodel using first-order logic with least fixed-point operator (FO+LFP), establishing polynomial-time complexity bounds for compliance inference.
+A compliance metamodel $\mathcal{M} = (D, G, X, L, F, A_0, R, J, O)$ consists of data containers $D$ (databases, tables, columns), governance scopes $G$ (organizational boundaries), facets $X$ (label categories), compliance labels $L$, frameworks $F$, ground assertions $A_0$, inference rules $R$, joinable pairs $J \subseteq D \times D$, and release operations $O$ across scopes.
+
+\begin{table}[ht]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{0.85}
+\begin{tabular}{@{}ll@{\hspace{0.5cm}}ll@{\hspace{0.5cm}}l@{}}
+\midrule
+\multicolumn{2}{c}{\textbf{Relations}} & \multicolumn{2}{c}{\textbf{Notation}} & \textbf{Structural Axioms} \\
+\midrule
+$d_1 \sqsubset d_2$ & $d_2$ contains $d_1$ & $l \in_X x$ & label $l$ in facet $x$ & Transitivity: \\
+$d_1 \bowtie d_2$ & joinable containers & $l \in_F f$ & label $l$ from framework $f$ & $d_1 \sqsubset d_2 \land d_2 \sqsubset d_3$ \\
+$\text{sib}(d_1, d_2)$ & sibling containers & $A \vdash \tau$ & derive assertion $\tau$ & $\implies d_1 \sqsubset d_3$ \\
+\cmidrule{5-5}
+\multicolumn{4}{l}{$(d,l,g,f,p) \in A$: assertion tuple in set $A$} & Irreflexivity: \\
+\multicolumn{4}{l}{$p \in \mathcal{P}(\Sigma \times V \times M)$: parameters with monotonicity modes} & $\forall d: \neg(d \sqsubset d)$ \\
+\cmidrule{5-5}
+\multicolumn{4}{l}{$M = \{\texttt{NI}, \texttt{ND}, \texttt{S}\}$: non-increasing, non-decreasing, static} & Label uniqueness: \\
+& & & & $\forall l \in L: \exists! x \in X: l \in_X x$ \\
+& & & & $\forall l \in L: \exists! f \in F: l \in_F f$ \\
+\bottomrule
+\end{tabular}
+\caption{Relations, notation, and structural axioms.}
+\label{tab:formalization-notation}
+\end{table}
+
+The inference relation $\vdash$ derives new assertions from existing ones. Each framework $f \in F$ has an effective rule set $R_f$ (including inherited rules), with the global rule set $R = \bigcup_{f \in F} R_f$. Release operations $O$ are framework-independent. Rules may include conditions $\phi$ that guard their application. Conditions are positive predicates: $\phi ::= \text{hasLabel}(d',l,g) \mid \text{containsLabel}(d',l,g) \mid \text{param}(d',\sigma,\text{op},\theta) \mid \phi_1 \land \phi_2 \mid \phi_1 \lor \phi_2$, where $d' \in \{d\} \cup \{d_p : d \sqsubset d_p\} \cup \{d_c : d_c \sqsubset d\}$ (self, parents, or children) for label checks, and $d' \in \{d, d_p : d \sqsubset d_p\}$ (self or parent) for parameter comparisons. Negation is excluded to ensure monotonicity. Assertions are written as tuples $(d,l,g,f,p) \in A$ where $d \in D$, $l \in L$, $g \in G$, $f \in F$, and $p$ encodes quantitative properties like $k$-anonymity thresholds with monotonicity modes.
+\begin{figure*}[ht]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{0.9}
+\begin{tabular}{@{}lll@{}}
+\hline \\[-0.5em]
+\textbf{Implication} & \textbf{Conditional Implication} & \textbf{Pure Condition} \\[0.2em]
+$\displaystyle\frac{(d,l,g,f',p) \in A \quad l \in L_{\text{from}}}
+{A \vdash (d,l_{\text{to}},g,f,\emptyset)}$ & 
+$\displaystyle\frac{(d,l,g,f',p) \in A \quad l \in L_{\text{from}} \quad \phi(d,g)}
+{A \vdash (d,l_{\text{to}},g,f,\emptyset)}$ &
+$\displaystyle\frac{\phi(d,g)}
+{A \vdash (d,l_{\text{out}},g,f,\emptyset)}$ \\[0.8em]
+
+\multicolumn{3}{l}{\textbf{Propagation} (quantified over direction $\rho \in \{\text{inward}, \text{outward}, \text{peer}, \text{joinable}\}$)} \\[0.2em]
+\multicolumn{3}{l}{$\displaystyle\frac{(d_1,l,g,f,p) \in A \quad \rho(d_1,d_2)}
+{A \vdash (d_2,l,g,f,p)}$ where $\text{inward}(d_1,d_2) \iff d_2 \sqsubset d_1$, $\text{outward}(d_1,d_2) \iff d_1 \sqsubset d_2$,} \\
+\multicolumn{3}{r}{$\text{peer}(d_1,d_2) \iff \text{sib}(d_1,d_2)$, $\text{joinable}(d_1,d_2) \iff d_1 \bowtie d_2$} \\[0.3em]
+\hline
+\end{tabular}
+\caption{Inference rules for compliance derivation.\footnotemark{} Implication rules derive new labels from existing ones, with or without conditions. Pure condition rules derive labels based solely on conditions $\phi(d,g)$. Propagation rules spread labels across container relationships.}
+\label{fig:inference-rules}
+\end{figure*}
+\footnotetext{Release operations for cross-scope data movement are omitted in the interest of space.}
+
+\paragraph{Framework Inheritance.}
+Let $\prec \subseteq F \times F$ denote the acyclic extension relation. Framework $f$'s effective rules: $R_f = R_f^{\text{decl}} \cup \{r \in R_{f'} : f \prec f' \land \neg\text{overrides}(f, r)\}$. Inheritance resolves before inference with $R = \bigcup_{f \in F} R_f$. Inherited rules create assertions attributed to the inheriting framework.
+
+\begin{theorem}[Convergence]\label{thm:convergence}
+For compliance system $(D, L, G, F, R)$ and initial assertions $A_0$, the monotonic operator $T(A) = A \cup \{\tau : A, R \vdash \tau\}$ generates sequence $A^{(0)} = A_0$, $A^{(i+1)} = T(A^{(i)})$ converging to fixed point $A^* = \bigcup_{i=0}^{\infty} A^{(i)}$ in at most $|D| \times |L| \times |G| \times |F|$ iterations. Convergence follows from monotonicity and finite assertion space.
+\end{theorem}
+
+
+\section{Implementation}\label{sec:implementation}
+
+The metamodel runs on Oxigraph~\cite{oxigraph}, an RDF triple store with iterative fixed-point evaluation. The complete implementation and example frameworks are available as open source~\cite{compliance-metamodel}. It comprises \begin{enumerate*}[label=(\arabic*)] \item the triple store, \item a compiler that translates Jena rules~\cite{jena} into SPARQL CONSTRUCT queries, and \item a fixed-point iterator\end{enumerate*}. While framework inheritance uses Jena rule syntax~\cite{jena}, the inference engine employs monotonic SPARQL CONSTRUCT queries that generate new triples without retracting existing ones. Statistical analyses like $k$-anonymity use SPARQL UPDATE queries to compute minimum cohort sizes $k = \min_{g \in G} |g|$ where $G$ partitions records by quasi-identifiers. Initialization compiles rules and skolemizes blank nodes in $A_0$. Each iteration applies all compiled queries to derive $A_{i+1}=T(A_i)$, repeating until $A_{i+1}=A_i$; the fixed point $A^*$ is then queried by the user.
+
+\begin{table}[ht]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{0.85}
+\begin{tabular}{@{}ll@{\hspace{0.8cm}}ll@{}}
+\midrule
+\multicolumn{2}{c}{\textbf{Primary Structures}} & \multicolumn{2}{c}{\textbf{Rule-Supporting Structures}} \\
+\midrule
+$D$ & {\footnotesize\texttt{:DataContainer}} & $\text{hasLabel}(d,l,g)$ & \fnsym{HasLabelCondition} \\
+$L$ & {\footnotesize\texttt{:ComplianceLabel}} & $\text{containsLabel}(d,l,g)$ & \fnsym{ContainsLabelCondition} \\
+$F$ & {\footnotesize\texttt{:Framework}} & container relations & \fnsym{RelationLabelCondition} \\
+$G$ & {\footnotesize\texttt{:GovernanceScope}} & $\text{param}(d,\sigma,\text{op},\theta)$ & \fnsym{ParameterCheckCondition} \\
+$X$ & {\footnotesize\texttt{:Facet}} & $\phi_1 \land \phi_2, \phi_1 \lor \phi_2$ & \fnsym{CompositeCondition} \\
+\cmidrule{3-4}
+$d_1 \sqsubset d_2$ & {\footnotesize\texttt{d1 :contains d2}} & Rule declarations: & \fnsym{SubclassDeclaration} \\
+$d_1 \bowtie d_2$ & {\footnotesize\texttt{d1 :joinableWith d2}} & & \fnsym{ConditionalEquivalence} \\
+$(d,l,g,f,p) \in A$ & RDF assertions\footnotemark & & \fnsym{PropagationDeclaration} \\
+\bottomrule
+\end{tabular}
+\caption{Mapping from formal model to RDF implementation.}
+\label{tab:rdf-mapping}
+\end{table}
+\footnotetext{See Appendix Figures~\ref{fig:appendix-compliance-assertion} and \ref{fig:appendix-containment-assertion} for assertion representations.}
+
+\enlargethispage{-0.5\baselineskip}
+
+\section{Related Work and Conclusion}\label{sec:related-conclusion}
+
+The Data Privacy Vocabulary (DPV)~\cite{pandit2019dpv} and the Open Digital Rights Language (ODRL)~\cite{odrl-model-2018,odrl-vocab-2018} are the leading semantic standards for privacy and governance. DPV, developed by the Data Privacy Vocabularies and Controls Community Group, provides a cross-jurisdictional vocabulary for describing data processing and is incorporated into ISO/IEC TS 27560:2023~\cite{iso27560}, which standardizes consent records using concepts such as \texttt{dpv:hasPurpose} and \texttt{dpv:ServiceProvision}. ODRL specifies permissions, prohibitions, and duties for data usage and underpins initiatives like the International Data Spaces Association~\cite{bader2020}. Both vocabularies are descriptive: DPV documents compliance attributes (e.g., \texttt{dpv:SensitivePersonalData}), while ODRL defines policies referencing them. ODRL supports temporal, spatial, and purpose-based constraints but assumes compliance labels are static. Other related efforts include LegalRuleML~\cite{legalruleml} (legal norms), PROV-O~\cite{prov-o} (provenance of compliance labels), and DCAT~\cite{dcat} (dataset description, aligned with our notion of data containers but lacking propagation). In domains, FIBO~\cite{fibo} and Gist~\cite{gist} provide complementary vocabularies, while International Data Spaces demonstrates ODRL integration with domain-specific vocabularies, offering a precedent for layering computational semantics onto existing standards.  
+
+Against this backdrop, we introduced a metamodel for multi-framework compliance addressing the five challenges in Section~\ref{sec:legal}. Governance scopes capture context-dependent classification, propagation rules reflect divergent philosophies (HIPAA’s expansive vs.\ GDPR’s precise), parameterized assertions encode quantitative measures such as $k$-anonymity, and framework attribution preserves provenance. The formalization establishes polynomial-time bounds via stratified fixed-point computation. Validation in a healthcare scenario showed vaccination records acquire PHI status only when joined with patient data, and an RDF/SPARQL implementation demonstrates feasibility atop existing semantic technologies.  
+
+Future work includes temporal reasoning for evolving states (including condition removal), PROV-O integration for audit trails, and comparative analysis to identify approaches spanning multiple frameworks. Logical extensions such as FO-LTL could verify compliance properties over time, while encoding jurisdictional variation suggests applications in international governance. Overall, the metamodel provides a foundation for transparent data annotation and systematic evaluation of compliance status, in line with ISO recommendations~\cite{iso19944,iso38505,iso27001}.
+
+
+\bibliographystyle{vancouver}
+\bibliography{refs}
+
+\newpage
+\appendix
+\section{Supplementary Details}
+
+This appendix provides implementation details and framework source code for readers interested in the technical realization of our approach. The material here supplements but is not essential for understanding the main contributions. Section~\ref{sec:appendix-rdf} shows RDF representations of data structures. Section~\ref{sec:appendix-inference} describes the inference system implementation. Section~\ref{sec:appendix-frameworks} contains framework definitions.
+
+\subsection{Data Structures}\label{sec:appendix-rdf}
+
+\begin{figure}[ht]
+\begin{lstlisting}[basicstyle=\ttfamily, frame=none]
+_:assertion a :ComplianceAssertion ;
+    :assertedOn d ;
+    :assertsLabel l ;
+    :assertedInScope s ;
+    :assertedByFramework w ;
+    :hasParameter [ :paramName sigma ;
+                    :paramValue v ;
+                    :monotonicity m ] .
+\end{lstlisting}
+\caption{RDF representation of a compliance assertion with optional parameters.}
+\label{fig:appendix-compliance-assertion}
+\end{figure}
+
+\begin{figure}[ht]
+\begin{lstlisting}[basicstyle=\ttfamily, frame=none]
+_:containment a :ContainmentAssertion ;
+    :assertedOn d ;
+    :assertsLabel l ;
+    :assertedInScope g .
+\end{lstlisting}
+\caption{RDF representation of a containment assertion.}
+\label{fig:appendix-containment-assertion}
+\end{figure}
+
+\begin{figure}[ht]
+\begin{lstlisting}[basicstyle=\ttfamily, frame=none]
+_:eval a :ConditionEvaluation ;
+    :evaluatesCondition _:cond ;
+    :evaluatedOn d ;
+    :evaluatedInScope g ;
+    :evaluationResult true .
+\end{lstlisting}
+\caption{RDF representation of condition evaluation tracking.}
+\label{fig:appendix-condition-eval}
+\end{figure}
+
+\begin{figure}[ht]
+\begin{lstlisting}[basicstyle=\ttfamily, frame=none]
+_:release a :ReleaseOperation ;
+    :fromScope g1 ;
+    :toScope g2 ;
+    :releasesLabel l ;
+    :whenCondition _:cond .
+\end{lstlisting}
+\caption{RDF representation of a release operation between governance scopes.}
+\label{fig:appendix-release-op}
+\end{figure}
+
+\subsection{Inference Engine}\label{sec:appendix-inference}
+
+The inference engine implements the formal semantics through fixed-point iteration over SPARQL CONSTRUCT queries. Starting from ground assertions and framework definitions, the system repeatedly applies all queries until no new triples are generated, guaranteeing polynomial-time convergence per Theorem~\ref{thm:convergence}. Each iteration executes all rule types: framework inheritance, rule expansion, condition evaluation, implication application, and propagation.
+
+\paragraph{Inheritance.}
+Jena rule syntax~\cite{jena} first establishes framework hierarchies (\texttt{dsf/rules/inheritance.rules}), allowing child frameworks to inherit parent rules unless explicitly overridden. While Jena~\cite{jena} provides declarative rule syntax, performance-critical operations are implemented directly as SPARQL CONSTRUCT queries for optimization. Expansion queries transform compact rule notation into executable form: \texttt{fromAnyLabel} containing multiple source labels expands into individual rules (\texttt{dsf/constructs/expand-from-labels.rq}), enabling frameworks to concisely specify that any of 18 HIPAA identifiers triggers PHI classification. Similarly, \texttt{fromAllLabels} rules expand to require all specified labels before firing.
+
+\paragraph{Conditions.}
+The system employs two-phase condition evaluation to avoid unnecessary computation. First, marking queries (\texttt{dsf/constructs/mark/conditional-implication.rq}) identify which conditions need evaluation based on available labels and missing targets. Marks propagate recursively through composite conditions (\texttt{dsf/constructs/mark/subconditions.rq}). Second, evaluation queries check marked conditions: \texttt{ContainsLabelCondition} verifies label presence in child containers, \texttt{RelationLabelCondition} checks parent or self labels, \texttt{ComparisonCondition} evaluates parameter thresholds, and \texttt{CompositeCondition} combines results with AND/OR logic.
+
+\paragraph{Implications.}
+Three query types handle implications based on complexity. Unconditional implications (\texttt{dsf/constructs/evaluate-unconditional.rq}) directly derive target labels without condition checking. Single-source conditional implications (\texttt{dsf/constructs/evaluate-single.rq}) verify condition evaluations before applying. Multi-source implications (\texttt{dsf/constructs/evaluate-from-all.rq}) ensure all required labels exist in the same scope before checking conditions. Each query generates deterministic assertion URIs through skolemization, preventing duplicate derivations across iterations.
+
+\paragraph{Propagation.}
+Four propagation queries spread labels according to framework-specific patterns. Inward propagation (\texttt{dsf/constructs/inward.rq}) copies parent labels to children, implementing GDPR's field-level precision. Outward propagation (\texttt{dsf/constructs/outward.rq}) bubbles child labels to parents, capturing HIPAA's container-level PHI designation. Peer propagation (\texttt{dsf/constructs/peer.rq}) shares labels among siblings, while joinable propagation (\texttt{dsf/constructs/joinable.rq}) transfers labels across declared relationships, enabling HIPAA's transitive PHI spread through joined datasets. All queries preserve parameter values and track derivation provenance.
+
+\paragraph{Optimization.}
+The implementation employs several optimizations for scalability. Label-scope indexing ({\footnotesize\texttt{:hasLabelInScope}}) accelerates lookups. Separate paths for conditional and unconditional rules avoid unnecessary condition checking. Pre-computed containment assertions enable efficient {\footnotesize\texttt{ContainsLabelCondition}} evaluation. Deterministic URI generation through content-based hashing ensures idempotent operations across iterations.
+
+\begin{figure}[ht]
+\begin{lstlisting}[basicstyle=\ttfamily, frame=none]
+@prefix : <https://openprovenance.org/ns/facet/dsf#>.
+
+[InheritPropagationRules:
+    (?Child :extends ?Parent)
+    (?Parent :hasPropagationRule ?Rule)
+    noValue(?Child :hasPropagationRule ?Rule)
+    ->
+    (?Child :hasPropagationRule ?Rule)
+]
+
+[InheritSubclassDeclarations:
+    (?Child :extends ?Parent)
+    (?Parent :declaresSubclassOf ?Decl)
+    noValue(?Child :overrides ?Decl)
+    ->
+    (?Child :declaresSubclassOf ?Decl)
+]
+\end{lstlisting}
+\caption{Jena rule syntax~\cite{jena} for framework inheritance (from inheritance.rules).}
+\label{fig:appendix-jena-rule}
+\end{figure}
+
+\begin{figure}[ht]
+\begin{lstlisting}[basicstyle=\ttfamily, frame=none, language=SPARQL]
+CONSTRUCT {
+  ?Child :hasPropagationRule ?Rule .
+}
+WHERE {
+  ?Child :extends ?Parent .
+  ?Parent :hasPropagationRule ?Rule .
+  FILTER NOT EXISTS { ?Child :hasPropagationRule ?Rule }
+}
+\end{lstlisting}
+\caption{SPARQL CONSTRUCT query compiled from inheritance rule.}
+\label{fig:appendix-sparql-construct}
+\end{figure}
+
+\begin{figure}[ht]
+\begin{lstlisting}[basicstyle=\ttfamily, frame=none, language=SPARQL]
+CONSTRUCT {
+  ?count a :ConditionCountAssertion ;
+    :forCondition ?andCond ;
+    :onContainer ?c ;
+    :inScope ?g ;
+    :satisfiedCount ?satisfied ;
+    :totalCount ?total .
+}
+WHERE {
+  SELECT ?andCond ?c ?g 
+         (COUNT(?satEval) as ?satisfied)
+         (COUNT(?subCond) as ?total)
+  WHERE {
+    ?andCond a :CompositeCondition ;
+             :logicalOperator :AND ;
+             :hasCondition ?subCond .
+    ?eval :evaluatesCondition ?andCond ;
+          :evaluatedOn ?c ;
+          :evaluatedInScope ?g .
+    OPTIONAL { 
+      ?satEval :evaluatesCondition ?subCond ;
+               :evaluatedOn ?c ;
+               :evaluationResult true .
+    }
+  }
+  GROUP BY ?andCond ?c ?g
+}
+\end{lstlisting}
+\caption{SPARQL query for evaluating AND conditions by counting satisfied subconditions.}
+\label{fig:appendix-and-condition}
+\end{figure}
+
+\subsection{Framework Definitions}\label{sec:appendix-frameworks}
+
+\begin{figure}[ht]
+\begin{lstlisting}[basicstyle=\ttfamily, frame=none]
+# Safe Harbor declares all 18 identifiers as trigger labels
+:HIPAASafeHarborFramework dsf:declaresSubclassOf [
+    dsf:fromAnyLabel 
+        base:Name,                    # (a) Names
+        base:Address,                 # (b) Geographic subdivisions
+        base:MomentData,              # (c) Date elements (except year)
+        base:Phone,                   # (d) Telephone numbers
+        base:Fax,                     # (e) Fax numbers
+        base:Email,                   # (f) Email addresses
+        base:SSN,                     # (g) Social Security numbers
+        base:MedicalRecordNumber,     # (h) Medical record numbers
+        base:HealthPlanNumber,        # (i) Health plan beneficiary numbers
+        base:AccountNumber,           # (j) Account numbers
+        base:CertificateNumber,       # (k) Certificate/license numbers
+        base:VehicleIdentifier,       # (l) Vehicle identifiers
+        base:DeviceIdentifier,        # (m) Device identifiers and serial numbers
+        base:WebURL,                  # (n) Web URLs
+        base:IPAddress,               # (o) IP addresses
+        base:BiometricData,           # (p) Biometric identifiers
+        base:FaceImage,               # (q) Full-face photographs
+        base:UniqueID ;               # (r) Unique identifying characteristics
+    dsf:toLabel :SafeHarborIdentifier
+] .
+\end{lstlisting}
+\caption{HIPAA Safe Harbor Framework: Complete source defining all 18 identifiers.}
+\label{fig:appendix-safe-harbor}
+\end{figure}
+
+\begin{figure}[ht]
+\begin{lstlisting}[basicstyle=\ttfamily, frame=none]
+:HIPAAExpertDeterminationFramework dsf:declaresImplication [
+    a dsf:ConditionalImplication ;
+    dsf:fromLabel base:KAnonymityAnalysis ;
+    dsf:toLabel :HighReidentificationRisk ;
+    dsf:hasCondition [
+        a dsf:ComparisonCondition ;
+        dsf:leftSource [
+            dsf:sourceType dsf:LabelParameter ;
+            dsf:sourceLabel base:KAnonymityAnalysis ;
+            dsf:sourceParameter "minimumCohortSize"
+        ] ;
+        dsf:rightSource [
+            dsf:sourceType dsf:LabelParameter ;
+            dsf:sourceLabel :ExpertDeterminationThreshold ;
+            dsf:sourceParameter "kThreshold" ;
+            dsf:defaultValue 3
+        ] ;
+        dsf:comparisonOperator dsf:lessThan
+    ] ;
+    rdfs:comment "K-anonymity below threshold triggers high re-identification risk"
+] .
+\end{lstlisting}
+\caption{HIPAA Expert Determination Framework: Statistical k-anonymity evaluation.}
+\label{fig:appendix-expert-determination}
+\end{figure}
+
+\begin{figure}[ht]
+\begin{lstlisting}[basicstyle=\ttfamily, frame=none]
+:GDPRFramework dsf:declaresImplication [
+    a dsf:ConditionalImplication ;
+    dsf:fromLabel base:Individual ;
+    dsf:toLabel :PersonalData ;
+    dsf:hasCondition [
+        a dsf:ContainsLabelCondition ;
+        dsf:requiresContains base:IdentifierData
+    ] ;
+    rdfs:comment "Data about individuals that CONTAINS identifiers IS personal data"
+] .
+
+:GDPRFramework dsf:declaresSubclassOf [
+    dsf:fromLabel :DataConcerningHealth ;
+    dsf:isSubclassOf :SpecialCategoryData ;
+    rdfs:comment "Data concerning health is one type of special category data per Article 9"
+] .
+
+:GDPRFramework dsf:declaresSubclassOf [
+    dsf:fromLabel :SpecialCategoryData ;
+    dsf:isSubclassOf :PersonalData ;
+    rdfs:comment "All special category data is personal data with additional protections"
+] .
+
+:GDPRFramework dsf:declaresPropagation [
+    a dsf:PropagationDeclaration ;
+    dsf:propagatesLabel :PersonalData ;
+    dsf:propagationDirection dsf:Inward ;
+    rdfs:comment "Personal data propagates inward only, maintaining field-level precision"
+] .
+\end{lstlisting}
+\caption{GDPR Framework: Context-sensitive personal data classification.}
+\label{fig:appendix-gdpr}
+\end{figure}
+
+\begin{figure}[ht]
+\begin{lstlisting}[basicstyle=\ttfamily, frame=none]
+:EMAFramework a dsf:Framework ;
+    dsf:extends gdpr:GDPRFramework ;
+    rdfs:comment "EMA interpretation of GDPR with k=12 threshold" .
+
+:EMAFramework dsf:declaresImplication [
+    a dsf:ConditionalImplication ;
+    dsf:fromLabel base:KAnonymityAnalysis ;
+    dsf:toLabel gdpr:HighReidentificationRisk ;
+    dsf:hasCondition [
+        a dsf:ComparisonCondition ;
+        dsf:leftSource [
+            dsf:sourceType dsf:LabelParameter ;
+            dsf:sourceLabel base:KAnonymityAnalysis ;
+            dsf:sourceParameter "minimumCohortSize"
+        ] ;
+        dsf:rightSource [
+            dsf:sourceType dsf:LabelParameter ;
+            dsf:sourceLabel :PseudonymizationThreshold ;
+            dsf:sourceParameter "kThreshold" ;
+            dsf:defaultValue 12
+        ] ;
+        dsf:comparisonOperator dsf:lessThan
+    ] ;
+    rdfs:comment "EMA: k < 12 indicates high reidentification risk"
+] .
+\end{lstlisting}
+\caption{EMA Framework: Conservative k-anonymity threshold extending GDPR.}
+\label{fig:appendix-ema}
+\end{figure}
+
+\begin{figure}[ht]
+\begin{lstlisting}[basicstyle=\ttfamily, frame=none]
+:ItalianDPAFramework a dsf:Framework ;
+    dsf:extends gdpr:GDPRFramework ;
+    rdfs:comment "Italian DPA's strict interpretation of GDPR Article 4(1)" .
+
+:ItalianDPAFramework dsf:declaresImplication [
+    a dsf:ConditionalImplication ;
+    dsf:fromLabel base:Individual ;
+    dsf:toLabel gdpr:PersonalData ;
+    dsf:hasCondition [
+        a dsf:ContainsLabelCondition ;
+        dsf:requiresContains base:UniqueCardinality
+    ] ;
+    rdfs:comment "Italian DPA: Individual data containing unique values is personal data"
+] .
+
+:ItalianDPAFramework dsf:declaresImplication [
+    a dsf:ConditionalImplication ;
+    dsf:fromLabel base:UniqueCardinality ;
+    dsf:toLabel gdpr:PersonalData ;
+    dsf:hasCondition [
+        a dsf:RelationLabelCondition ;
+        dsf:onRelation dsf:Self ;
+        dsf:requiresLabel base:Individual
+    ] ;
+    rdfs:comment "Italian DPA: Unique values on individuals are sufficient for PersonalData"
+] .
+\end{lstlisting}
+\caption{Italian DPA Framework: Strict uniqueness-based personal data classification.}
+\label{fig:appendix-italian-dpa}
+\end{figure}
+
+\end{document}

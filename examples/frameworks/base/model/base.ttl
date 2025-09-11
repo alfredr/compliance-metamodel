@@ -1,0 +1,720 @@
+@prefix : <https://openprovenance.org/ns/facet/base#> .
+@prefix dsf: <https://openprovenance.org/ns/facet/dsf#> .
+@prefix base: <https://openprovenance.org/ns/facet/base#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+
+:BaseFramework a dsf:Framework ;
+    dsf:hasFacet :Subject, :Control, :Domain, :Kind, :Identifier ;
+    dsf:hasPropagationRule [
+        a dsf:PropagationRule ;
+        dsf:propagatesFacet :Type ;
+        dsf:propagationBehavior dsf:Inward
+    ] ;
+    dsf:hasPropagationRule [
+        a dsf:PropagationRule ;
+        dsf:propagatesFacet :Kind ;
+        dsf:propagationBehavior dsf:Inward
+    ] ;
+    dsf:hasPropagationRule [
+        a dsf:PropagationRule ;
+        dsf:propagatesFacet :Domain ;
+        dsf:propagationBehavior dsf:Inward
+    ] ;
+    
+    dsf:hasPropagationRule [
+        a dsf:PropagationRule ;
+        dsf:propagatesLabel :Identifiable ;
+        dsf:propagationBehavior dsf:Joinable
+    ] ;
+    dsf:hasPropagationRule [
+        a dsf:PropagationRule ;
+        dsf:propagatesLabel :Identifiable ;
+        dsf:propagationBehavior dsf:Peer
+    ] .
+
+
+:Subject a dsf:Facet ;
+    dsf:hasSubfacet :Type ;
+    rdfs:comment "Facet describing who or what entity the data concerns" .
+
+:Type a dsf:Facet ;
+    dsf:hasLabel :Individual, :Organization ;
+    rdfs:comment "Types of data subjects" .
+
+:Control a dsf:Facet ;
+    rdfs:comment "Facet for data handling and protection requirements" .
+
+:Domain a dsf:Facet ;
+    dsf:hasLabel :Healthcare, :Financial, :Education, :Government ;
+    rdfs:comment "Facet for operational domains and contexts" .
+
+:Kind a dsf:Facet ;
+    rdfs:comment "Facet describing the semantic meaning and type of stored data" ;
+    dsf:hasLabel 
+        # Abstract category labels
+        :IdentifierData,  # Parent for all identifier semantic types
+        :OfficialIdentifierData, :LocationData, :PhysicalLocationData,
+        :DigitalResourceIdentifier, :TemporalData, :MomentData, :DurationData,
+        :CommunicationData, :BiometricData,
+        
+        # Concrete data type labels
+        :Name, :EmailAddress, :TelephoneNumber, :FaxNumber,
+        :SocialSecurityNumber, :DriversLicenseNumber, :PassportNumber,
+        :TaxIdentificationNumber, :MedicalRecordNumber, :HealthPlanNumber,
+        :DEANumber, :DateOfBirth, :ZipCode, :Gender, :Race, :Age,
+        :StreetAddress, :City, :State, :Country, :IPAddress, :MACAddress,
+        :URL, :DeviceID, :Timestamp, :AdmissionDate, :DischargeDate,
+        :DateRange, :ServicePeriod, :Fingerprint, :FacialImage,
+        :VoicePrint, :Photograph, :AccountNumber, :CustomerID,
+        :EmployeeID, :VehicleIdentificationNumber, :LicensePlateNumber,
+        
+        # Health-related labels
+        :HealthData,  # Parent for all health-related data
+        :DiagnosisCode, :TreatmentCode,
+        
+        # Identifiability labels
+        :Identifiable .  # Data that can be linked to individuals
+
+:Identifier a dsf:Facet ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Facet for how data functions as identifiers - orthogonal to semantic type" ;
+    dsf:hasSubfacet :Cardinality, :Knowability ;  # Subfacets for orthogonal properties
+    dsf:hasLabel
+        # Identifier categories
+        :Identifier,           # Parent class for all identifier types
+        :DirectIdentifier,     # Directly identifies (was DirectIdentifierData)
+        :IndirectIdentifier,   # Quasi-identifiers (was IndirectIdentifierData)
+        :InternalIdentifier . # Internal processing identifiers - ephemeral, one-time use
+
+
+:Identifier a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Identifier ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Parent class for all identifier types in Identifier facet" .
+
+:DirectIdentifier a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Identifier ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:subClassOf :Identifier ;
+    rdfs:comment "Directly identifies individuals (e.g., name, SSN)" .
+
+:IndirectIdentifier a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Identifier ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:subClassOf :Identifier ;
+    rdfs:comment "Quasi-identifiers that could identify when combined (for k-anonymity)" .
+
+:InternalIdentifier a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Identifier ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:subClassOf :Identifier ;
+    rdfs:comment "Internal processing identifier - ephemeral, one-time use identifier" .
+
+# K-Anonymity Analysis - Statistical privacy measure
+:KAnonymityAnalysis a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Identifier ;  # Related to re-identification risk
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "K-Anonymity Analysis" ;
+    rdfs:comment "Statistical analysis of minimum cohort size for quasi-identifiers" ;
+    dsf:hasParameterDefinition [
+        dsf:parameterName "minimumCohortSize" ;
+        dsf:parameterType xsd:integer ;
+        dsf:parameterDescription "Minimum number of individuals sharing the same quasi-identifiers (k value)"
+    ] .
+
+
+:Cardinality a dsf:Facet ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Statistical property describing how many individuals share a value" ;
+    dsf:hasLabel
+        :UniqueCardinality,           # Exactly one individual (equiv to ClosedGroupCardinality(1))
+        :ClosedGroupCardinality,      # Fixed group of n individuals
+        :OpenGroupCardinality .       # Scales with population
+
+:Knowability a dsf:Facet ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Access property describing where/how a value can be known or linked" ;
+    dsf:hasLabel
+        :OpenKnowability,             # Observable/accessible outside our system
+        :ClosedKnowability .          # Only meaningful within specific scope(s)
+
+
+:UniqueCardinality a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Cardinality ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Value uniquely identifies one individual (SSN, email, row ID)" .
+
+:ClosedGroupCardinality a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Cardinality ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Membership in actual group of n individuals (department, household)" .
+
+:OpenGroupCardinality a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Cardinality ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Scales proportionally with population (ZIP code, age group, blood type)" .
+
+
+:OpenKnowability a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Knowability ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Observable/accessible outside our system (names, public records, emails)" .
+
+:ClosedKnowability a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Knowability ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Only meaningful within specific scope(s) (database IDs, session tokens)" .
+
+
+:IdentifierData a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Abstract parent for all data that can identify entities" .
+
+# DirectIdentifierData and IndirectIdentifierData removed - replaced by functional mappings
+# Semantic types (Name, SSN) now map directly to functional classifications (DirectIdentifier)
+
+:OfficialIdentifierData a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Abstract parent for government-issued identifiers" .
+
+:LocationData a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Abstract parent for all location-related data" .
+
+:PhysicalLocationData a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Abstract parent for physical world addresses" .
+
+:DigitalResourceIdentifier a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Abstract parent for digital resource identifiers and network addresses" .
+
+:TemporalData a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Abstract parent for all time-related data" .
+
+:MomentData a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Abstract parent for specific points in time" .
+
+:DurationData a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Abstract parent for time periods and durations" .
+
+:CommunicationData a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Abstract parent for communication-related data" .
+
+:BiometricData a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Abstract parent for biological/physiological characteristics" .
+
+:InternalUUID a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Internal UUID - unique per record, only meaningful within system" .
+
+
+:Name a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Personal names including first, middle, last names" .
+
+:EmailAddress a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Email addresses" .
+
+:TelephoneNumber a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Phone numbers including mobile and landline" .
+
+:FaxNumber a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Fax numbers" .
+
+# Official Government Identifiers
+:SocialSecurityNumber a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Government-issued SSN" .
+
+:DriversLicenseNumber a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Government-issued driver's license" .
+
+:PassportNumber a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Government-issued passport number" .
+
+:TaxIdentificationNumber a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Tax ID or EIN" .
+
+# Healthcare Identifiers
+:MedicalRecordNumber a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Medical record identifiers" .
+
+:HealthPlanNumber a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Health insurance plan numbers" .
+
+:DEANumber a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Drug Enforcement Administration registration number" .
+
+# Quasi-Identifiers
+:DateOfBirth a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Birth dates" .
+
+:Gender a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+:Race a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+:Age a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+# Physical Location Data
+:StreetAddress a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Street addresses" .
+
+:City a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+:State a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+:Country a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+:ZipCode a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Postal codes" .
+
+# Digital Location Data
+:IPAddress a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "IP addresses" .
+
+:MACAddress a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "MAC addresses" .
+
+:URL a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+:DeviceID a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Unique device identifiers" .
+
+# Temporal Data
+:Timestamp a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Specific date/time stamps" .
+
+:AdmissionDate a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "Healthcare admission dates" .
+
+:DischargeDate a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+:DateRange a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+:ServicePeriod a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+# Biometric Data
+:Fingerprint a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+:FacialImage a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+:VoicePrint a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+:Photograph a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "General photographs that may identify individuals" .
+
+# Account and Reference Numbers
+:AccountNumber a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+:CustomerID a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+:EmployeeID a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+:VehicleIdentificationNumber a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:comment "VIN" .
+
+:LicensePlateNumber a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework .
+
+
+:BaseFramework
+    # Note: DirectIdentifierData and IndirectIdentifierData removed
+    # Semantic types now map directly to functional classifications below
+    
+    # All identifier semantic types are still IdentifierData for semantic grouping
+    dsf:declaresImplication [
+        dsf:fromAnyLabel (:Name :EmailAddress :TelephoneNumber :FaxNumber
+                     :SocialSecurityNumber :DriversLicenseNumber :PassportNumber
+                     :TaxIdentificationNumber :MedicalRecordNumber :HealthPlanNumber
+                     :DEANumber :StreetAddress :MACAddress :DeviceID :AccountNumber
+                     :CustomerID :EmployeeID :VehicleIdentificationNumber
+                     :LicensePlateNumber :Fingerprint :FacialImage :VoicePrint
+                     :DateOfBirth :ZipCode :Gender :Race :Age :City :State
+                     :Country :IPAddress :AdmissionDate :DischargeDate
+                     :ServicePeriod :Photograph) ;
+        dsf:toLabel :IdentifierData  # Semantic parent for all identifier types
+    ] ;
+    
+    # Semantic types that function as direct identifiers
+    dsf:declaresImplication [
+        dsf:fromAnyLabel (:Name :EmailAddress :TelephoneNumber :FaxNumber
+                     :SocialSecurityNumber :DriversLicenseNumber :PassportNumber
+                     :TaxIdentificationNumber :MedicalRecordNumber :HealthPlanNumber
+                     :DEANumber :NationalProviderIdentifier :StreetAddress :MACAddress 
+                     :DeviceID :AccountNumber :CustomerID :EmployeeID 
+                     :VehicleIdentificationNumber :LicensePlateNumber 
+                     :Fingerprint :FacialImage :VoicePrint) ;
+        dsf:toLabel :DirectIdentifier  # Maps to functional classification
+    ] ;
+    
+    # Semantic types that function as indirect identifiers (quasi-identifiers)
+    dsf:declaresImplication [
+        dsf:fromAnyLabel (:DateOfBirth :ZipCode :Gender :Race :Age :MaritalStatus
+                     :City :State :Country :IPAddress :AdmissionDate :DischargeDate
+                     :ServicePeriod :Photograph :Timestamp) ;
+        dsf:toLabel :IndirectIdentifier  # Maps to functional classification
+    ] ;
+    
+    # Official identifiers (multi-inheritance with DirectIdentifier)
+    dsf:declaresImplication [
+        dsf:fromAnyLabel (:SocialSecurityNumber :DriversLicenseNumber :PassportNumber
+                     :TaxIdentificationNumber :DEANumber :VehicleIdentificationNumber
+                     :LicensePlateNumber) ;
+        dsf:toLabel :OfficialIdentifierData
+    ] ;
+    
+    # Abstract category hierarchies
+    dsf:declaresImplication [
+        dsf:fromLabel :OfficialIdentifierData ;
+        dsf:toLabel :IdentifierData
+    ] ;
+    
+    # Location data hierarchy (only physical locations)
+    dsf:declaresImplication [
+        dsf:fromLabel :PhysicalLocationData ;
+        dsf:toLabel :LocationData
+    ] ;
+    
+    dsf:declaresImplication [
+        dsf:fromAnyLabel (:StreetAddress :City :State :Country :ZipCode) ;
+        dsf:toLabel :PhysicalLocationData
+    ] ;
+    
+    # Digital resource identifiers (separate from location)
+    dsf:declaresImplication [
+        dsf:fromAnyLabel (:IPAddress :MACAddress :URL :DeviceID) ;
+        dsf:toLabel :DigitalResourceIdentifier
+    ] ;
+    
+    # Digital identifiers are also identifiers
+    dsf:declaresImplication [
+        dsf:fromLabel :DigitalResourceIdentifier ;
+        dsf:toLabel :IdentifierData
+    ] ;
+    
+    # Temporal data hierarchy (already correct)
+    dsf:declaresImplication [
+        dsf:fromAnyLabel (:MomentData :DurationData) ;
+        dsf:toLabel :TemporalData
+    ] ;
+    
+    dsf:declaresImplication [
+        dsf:fromAnyLabel (:DateOfBirth :Timestamp :AdmissionDate :DischargeDate) ;
+        dsf:toLabel :MomentData
+    ] ;
+    
+    dsf:declaresImplication [
+        dsf:fromAnyLabel (:Age :DateRange :ServicePeriod) ;
+        dsf:toLabel :DurationData
+    ] ;
+    
+    # Communication data (also digital resource identifiers)
+    dsf:declaresImplication [
+        dsf:fromAnyLabel (:EmailAddress :TelephoneNumber :FaxNumber) ;
+        dsf:toLabel :CommunicationData
+    ] ;
+    
+    # Email is also a digital resource identifier
+    dsf:declaresImplication [
+        dsf:fromLabel :EmailAddress ;
+        dsf:toLabel :DigitalResourceIdentifier
+    ] ;
+    
+    # Biometric data
+    dsf:declaresImplication [
+        dsf:fromAnyLabel (:Fingerprint :FacialImage :VoicePrint :Photograph) ;
+        dsf:toLabel :BiometricData
+    ] ;
+    
+    # Medical codes are types of identifiers AND health data
+    dsf:declaresImplication [
+        dsf:fromAnyLabel (:DiagnosisCode :TreatmentCode) ;
+        dsf:toLabel :IdentifierData ;
+        rdfs:comment "Medical codes are types of identifiers"
+    ] ;
+    
+    # Medical codes are all types of health data
+    dsf:declaresImplication [
+        dsf:fromAnyLabel (:DiagnosisCode :TreatmentCode :DrugCode :DosageCode :MedicalRecordNumber :HealthPlanNumber) ;
+        dsf:toLabel :HealthData ;
+        rdfs:comment "Medical codes are health-related data"
+    ] .
+
+
+# DirectIdentifier = UniqueCardinality AND OpenKnowability (bidirectional)
+:BaseFramework dsf:declaresEquivalent [
+    a dsf:ConditionalEquivalence ;
+    dsf:fromAllLabels (:UniqueCardinality :OpenKnowability) ;
+    dsf:toLabel :DirectIdentifier ;
+    # No condition needed - this is a pure bidirectional equivalence
+    rdfs:comment "DirectIdentifier is equivalent to UniqueCardinality AND OpenKnowability"
+] .
+
+# InternalIdentifier = UniqueCardinality AND ClosedKnowability (bidirectional)
+:BaseFramework dsf:declaresEquivalent [
+    a dsf:ConditionalEquivalence ;
+    dsf:fromAllLabels (:UniqueCardinality :ClosedKnowability) ;
+    dsf:toLabel :InternalIdentifier ;
+    # No condition needed - this is a pure bidirectional equivalence
+    rdfs:comment "InternalIdentifier is equivalent to UniqueCardinality AND ClosedKnowability"
+] .
+
+# IndirectIdentifier = OpenGroupCardinality AND OpenKnowability (bidirectional)
+# For quasi-identifiers that could identify when combined
+:BaseFramework dsf:declaresEquivalent [
+    a dsf:ConditionalEquivalence ;
+    dsf:fromAllLabels (:OpenGroupCardinality :OpenKnowability) ;
+    dsf:toLabel :IndirectIdentifier ;
+    # No condition needed - this is a pure bidirectional equivalence
+    rdfs:comment "IndirectIdentifier is equivalent to OpenGroupCardinality AND OpenKnowability"
+] .
+
+# InternalUUID implies UniqueCardinality and ClosedKnowability
+:BaseFramework
+    dsf:declaresImplication [
+        dsf:fromLabel :InternalUUID ;
+        dsf:toLabel :UniqueCardinality ;
+        rdfs:comment "Internal UUIDs are always unique"
+    ] ;
+    dsf:declaresImplication [
+        dsf:fromLabel :InternalUUID ;
+        dsf:toLabel :ClosedKnowability ;
+        rdfs:comment "Internal UUIDs are only meaningful within the system"
+    ] ;
+    dsf:declaresImplication [
+        dsf:fromLabel :InternalUUID ;
+        dsf:toLabel :IdentifierData ;
+        rdfs:comment "Internal UUIDs are identifiers"
+    ] .
+
+
+:Healthcare a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Domain ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Healthcare" ;
+    rdfs:comment "Healthcare domain indicator" .
+
+:Financial a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Domain ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Financial" ;
+    rdfs:comment "Financial domain indicator" .
+
+:Education a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Domain ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Education" ;
+    rdfs:comment "Education domain indicator" .
+
+:Government a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Domain ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Government" ;
+    rdfs:comment "Government domain indicator" .
+
+
+:Individual a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Type ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Individual" ;
+    rdfs:comment "Data concerning an individual person" .
+
+:Organization a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Type ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Organization" ;
+    rdfs:comment "Data concerning an organizational entity" .
+
+
+:BaseFramework
+    dsf:declaresImplication [
+        dsf:fromAnyLabel (:SocialSecurityNumber :DriversLicenseNumber :PassportNumber
+                     :DateOfBirth :Gender :Race :Age
+                     :Fingerprint :FacialImage :VoicePrint
+                     :MedicalRecordNumber :HealthPlanNumber) ;
+        dsf:toLabel :Individual ;
+        rdfs:comment "Person-specific identifiers imply Individual subject type"
+    ] .
+
+
+:Identifiable a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Identifiable" ;
+    rdfs:comment "Data that can be linked to specific individuals through direct identifiers or joinable relationships" .
+
+# Rule: Direct identifiers are inherently identifiable
+:BaseFramework dsf:declaresImplication [
+    a dsf:Implication ;
+    dsf:fromLabel :DirectIdentifier ;
+    dsf:toLabel :Identifiable ;
+    rdfs:comment "Direct identifiers are always identifiable"
+] .
+
+# Rule: Containers with direct identifiers are identifiable
+:BaseFramework dsf:declaresConditional [
+    a dsf:ConditionalRule ;
+    dsf:toLabel :Identifiable ;
+    dsf:hasCondition [
+        a dsf:ContainsLabelCondition ;
+        dsf:requiresContains :DirectIdentifier
+    ] ;
+    rdfs:comment "Containers that contain direct identifiers are identifiable"
+] .
+
+
+
+:HealthData a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Health Data" ;
+    rdfs:comment "Health-related information (medical codes, diagnoses, treatments) regardless of subject" .
+
+:DiagnosisCode a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Diagnosis Code" ;
+    rdfs:comment "Medical diagnosis codes (ICD-10, etc.)" .
+
+:TreatmentCode a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Treatment Code" ;
+    rdfs:comment "Medical treatment or procedure codes" .
+
+# Additional Medical and Administrative Labels
+:MaritalStatus a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Marital Status" ;
+    rdfs:comment "Marital status indicator (married, single, divorced, etc.)" .
+
+:LabCode a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Laboratory Code" ;
+    rdfs:comment "Laboratory test codes (LOINC, CPT, etc.)" .
+
+:LabResult a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Laboratory Result" ;
+    rdfs:comment "Laboratory test results and values" .
+
+:DrugCode a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Drug Code" ;
+    rdfs:comment "Medication/drug codes (NDC, RxNorm, etc.)" .
+
+:DosageCode a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Dosage Code" ;
+    rdfs:comment "Medication dosage codes" .
+
+:DosageUnits a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "Dosage Units" ;
+    rdfs:comment "Medication dosage units (mg, ml, tablets, etc.)" .
+
+:NationalProviderIdentifier a dsf:ComplianceLabel ;
+    dsf:belongsToFacet :Kind ;
+    dsf:introducedByFramework :BaseFramework ;
+    rdfs:label "National Provider Identifier" ;
+    rdfs:comment "NPI number for healthcare providers" .

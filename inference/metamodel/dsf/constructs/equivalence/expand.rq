@@ -1,0 +1,72 @@
+PREFIX dsf: <https://openprovenance.org/ns/facet/dsf#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+# Expand dsf:declaresEquivalent into bidirectional dsf:declaresImplication rules
+# Each equivalence A ↔ B becomes:
+# 1. A → B (forward implication)
+# 2. B → A (reverse implication)
+
+CONSTRUCT {
+    # Forward implication: from → to
+    ?framework dsf:declaresImplication ?forwardImpl .
+    ?forwardImpl a dsf:ConditionalImplication ;
+        ?fromPredicate ?fromLabels ;
+        ?toPredicate ?toLabels ;
+        dsf:hasCondition ?condition ;
+        rdfs:comment ?forwardComment .
+
+    # Reverse implication: to → from
+    ?framework dsf:declaresImplication ?reverseImpl .
+    ?reverseImpl a dsf:ConditionalImplication ;
+        ?reversedFromPredicate ?toLabels ;
+        ?reversedToPredicate ?fromLabels ;
+        dsf:hasCondition ?condition ;
+        rdfs:comment ?reverseComment .
+}
+WHERE {
+    # Find all equivalence declarations
+    ?framework dsf:declaresEquivalent ?equiv .
+    ?equiv a dsf:ConditionalEquivalence .
+
+    # Get the from predicate and labels
+    ?equiv ?fromPredicate ?fromLabels .
+    FILTER(?fromPredicate IN (dsf:fromLabel, dsf:fromAnyLabel, dsf:fromAllLabels))
+
+    # Get the to predicate and labels
+    ?equiv ?toPredicate ?toLabels .
+    FILTER(?toPredicate IN (dsf:toLabel, dsf:toAnyLabel, dsf:toAllLabels))
+
+    # Get any conditions (optional)
+    OPTIONAL { ?equiv dsf:hasCondition ?condition }
+
+    # Get comment if exists
+    OPTIONAL { ?equiv rdfs:comment ?origComment }
+
+    # Create appropriate reversed predicates
+    BIND(
+        IF(?toPredicate = dsf:toLabel, dsf:fromLabel,
+        IF(?toPredicate = dsf:toAnyLabel, dsf:fromAnyLabel,
+        IF(?toPredicate = dsf:toAllLabels, dsf:fromAllLabels,
+        dsf:fromLabel))) AS ?reversedFromPredicate
+    )
+
+    BIND(
+        IF(?fromPredicate = dsf:fromLabel, dsf:toLabel,
+        IF(?fromPredicate = dsf:fromAnyLabel, dsf:toAnyLabel,
+        IF(?fromPredicate = dsf:fromAllLabels, dsf:toAllLabels,
+        dsf:toLabel))) AS ?reversedToPredicate
+    )
+
+    # Create comments for the implications
+    BIND(IF(BOUND(?origComment),
+            CONCAT(?origComment, " (forward implication)"),
+            "Forward implication from equivalence") AS ?forwardComment)
+
+    BIND(IF(BOUND(?origComment),
+            CONCAT(?origComment, " (reverse implication)"),
+            "Reverse implication from equivalence") AS ?reverseComment)
+
+    # Create stable IRIs for the implications based on the equivalence IRI
+    BIND(IRI(CONCAT(STR(?equiv), "-forward")) AS ?forwardImpl)
+    BIND(IRI(CONCAT(STR(?equiv), "-reverse")) AS ?reverseImpl)
+}

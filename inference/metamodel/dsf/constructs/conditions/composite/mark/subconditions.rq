@@ -1,0 +1,35 @@
+PREFIX dsf: <https://openprovenance.org/ns/facet/dsf#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+# Propagate marks from CompositeConditions to their subconditions
+# When a CompositeCondition is marked for evaluation, all its subconditions
+# need to be evaluated to determine the composite's result
+
+CONSTRUCT {
+    ?subMark rdf:type dsf:ConditionMark ;
+             dsf:markedCondition ?subCondition ;
+             dsf:markedForContainer ?container ;
+             dsf:markedInScope ?scope ;
+             dsf:markedFromComposite ?compositeCondition .
+}
+WHERE {
+    # Find marked CompositeConditions
+    ?mark rdf:type dsf:ConditionMark ;
+          dsf:markedCondition ?compositeCondition ;
+          dsf:markedForContainer ?container ;
+          dsf:markedInScope ?scope .
+    
+    # Check if it's a CompositeCondition
+    ?compositeCondition rdf:type dsf:CompositeCondition ;
+                        dsf:hasCondition ?subCondition .
+    
+    # Generate deterministic mark URI for subcondition
+    BIND(IRI(CONCAT("urn:mark:",
+                    MD5(CONCAT(STR(?subCondition), ":", STR(?container), ":", STR(?scope)))))
+         AS ?subMark)
+    
+    # Only create if mark doesn't already exist
+    FILTER NOT EXISTS {
+        ?subMark rdf:type dsf:ConditionMark .
+    }
+}

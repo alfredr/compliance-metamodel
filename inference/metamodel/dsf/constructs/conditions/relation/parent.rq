@@ -1,0 +1,46 @@
+PREFIX dsf: <https://openprovenance.org/ns/facet/dsf#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+# RelationLabelCondition Evaluation - Parent Relations Only
+# Check if a container's parent has required labels
+
+CONSTRUCT {
+    ?eval rdf:type dsf:ConditionEvaluation ;
+          dsf:evaluatesCondition ?condition ;
+          dsf:evaluatedOn ?container ;
+          dsf:evaluatedInScope ?scope ;
+          dsf:evaluationResult "true"^^xsd:boolean .
+}
+WHERE {
+    # Start from parent conditions that exist
+    ?condition rdf:type dsf:RelationLabelCondition ;
+               dsf:onRelation dsf:Parent ;
+               dsf:requiresLabel ?requiredLabel .
+
+    # Find implications using this condition
+    ?impl dsf:hasCondition ?condition ;
+          dsf:fromLabel ?fromLabel .
+
+    # Find containers with fromLabel in specific scopes (using index)
+    ?container dsf:hasLabelInScope ?labelScope .
+    ?labelScope dsf:label ?fromLabel ;
+               dsf:scope ?scope .
+
+    # Check if container's parent has the required label
+    ?parent dsf:contains ?container .
+    ?parentAssertion rdf:type dsf:ComplianceAssertion ;
+                     dsf:assertedOn ?parent ;
+                     dsf:assertedInScope ?scope ;
+                     dsf:assertsLabel ?requiredLabel .
+
+    # Create deterministic evaluation URI
+    BIND(IRI(CONCAT("urn:eval:relation:",
+                    MD5(CONCAT(STR(?condition), ":", STR(?container), ":", STR(?scope)))))
+         AS ?eval)
+
+    # Only create if not already exists (check the specific URI)
+    FILTER NOT EXISTS {
+        ?eval rdf:type dsf:ConditionEvaluation .
+    }
+}

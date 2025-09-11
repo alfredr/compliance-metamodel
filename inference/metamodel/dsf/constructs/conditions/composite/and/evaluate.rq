@@ -1,0 +1,44 @@
+PREFIX dsf: <https://openprovenance.org/ns/facet/dsf#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+# Fast AND evaluation - check all subconditions are satisfied
+
+CONSTRUCT {
+    ?eval rdf:type dsf:ConditionEvaluation ;
+          dsf:evaluatesCondition ?andCondition ;
+          dsf:evaluatedOn ?container ;
+          dsf:evaluatedInScope ?scope ;
+          dsf:evaluationResult "true"^^xsd:boolean .
+}
+WHERE {
+    # Concrete anchor: marked AND conditions
+    ?mark rdf:type dsf:ConditionMark ;
+          dsf:markedCondition ?andCondition ;
+          dsf:markedForContainer ?container ;
+          dsf:markedInScope ?scope .
+    
+    ?andCondition dsf:logicalOperator dsf:AND .
+    
+    # Generate eval URI early
+    BIND(IRI(CONCAT("urn:eval:composite-and:",
+                    MD5(CONCAT(STR(?andCondition), ":", STR(?container), ":", STR(?scope)))))
+         AS ?eval)
+    
+    # Skip if already evaluated
+    FILTER NOT EXISTS {
+        ?eval rdf:type dsf:ConditionEvaluation .
+    }
+    
+    # Check no missing subconditions (MINUS is faster than nested FILTER NOT EXISTS)
+    MINUS {
+        ?andCondition dsf:hasCondition ?sub .
+        MINUS {
+            ?subEval rdf:type dsf:ConditionEvaluation ;
+                    dsf:evaluatesCondition ?sub ;
+                    dsf:evaluatedOn ?container ;
+                    dsf:evaluatedInScope ?scope ;
+                    dsf:evaluationResult "true"^^xsd:boolean .
+        }
+    }
+}

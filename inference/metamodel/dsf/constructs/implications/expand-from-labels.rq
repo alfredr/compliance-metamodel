@@ -1,0 +1,46 @@
+PREFIX dsf: <https://openprovenance.org/ns/facet/dsf#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+# Expand dsf:fromAnyLabel with multiple labels into separate dsf:fromLabel implications
+# For example: (A B C) → D becomes:
+# - A → D
+# - B → D
+# - C → D
+
+CONSTRUCT {
+    # Create individual implications for each source label
+    ?framework dsf:declaresImplication ?expandedImpl .
+    ?expandedImpl a dsf:ConditionalImplication ;
+        dsf:fromLabel ?singleFromLabel ;
+        ?toPredicate ?toLabels ;
+        dsf:hasCondition ?condition ;
+        rdfs:comment ?expandedComment .
+}
+WHERE {
+    # Find implications with fromAnyLabel
+    ?framework dsf:declaresImplication ?impl .
+    ?impl a dsf:ConditionalImplication ;
+          dsf:fromAnyLabel ?fromLabels .
+
+    # Get the to predicate and labels
+    ?impl ?toPredicate ?toLabels .
+    FILTER(?toPredicate IN (dsf:toLabel, dsf:toAnyLabel))
+
+    # Get any conditions (optional)
+    OPTIONAL { ?impl dsf:hasCondition ?condition }
+
+    # Get comment if exists
+    OPTIONAL { ?impl rdfs:comment ?origComment }
+
+    # Extract individual labels from the list
+    ?fromLabels rdf:rest*/rdf:first ?singleFromLabel .
+
+    # Create expanded comment
+    BIND(IF(BOUND(?origComment),
+            CONCAT(?origComment, " (expanded from multi-source)"),
+            "Expanded from multi-source implication") AS ?expandedComment)
+
+    # Create stable IRI for the expanded implication based on original IRI and label
+    BIND(IRI(CONCAT(STR(?impl), "-from-", ENCODE_FOR_URI(STR(?singleFromLabel)))) AS ?expandedImpl)
+}
